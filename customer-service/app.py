@@ -29,6 +29,9 @@ def init_db():
             db.session.commit()
             print("Seed de dados para Clientes aplicado com sucesso!")
 
+# Garante inicialização do banco mesmo ao executar via Gunicorn/App Service
+init_db()
+
 # Health check
 @app.route("/health", methods=["GET"])
 def health():

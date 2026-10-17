@@ -1,0 +1,43 @@
+name: Deploy Customer Service to Azure App Service
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'customer-service/**'
+      - '.github/workflows/deploy-customer-service.yml'
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Create and activate virtual environment & Install dependencies
+        run: |
+          cd customer-service
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create deployment artifact
+        run: |
+          cd customer-service
+          zip -r ../release.zip . -x "*.db" -x "__pycache__/*" -x "venv/*"
+
+      - name: Deploy to Azure WebApp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'formativa-customer-service'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_CUSTOMER }}
+          package: release.zip
