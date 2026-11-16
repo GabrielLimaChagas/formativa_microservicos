@@ -8,7 +8,7 @@ class CustomerRepository(ABC):
         pass
 
     @abstractmethod
-    def get_by_id(self, customer_id: int) -> Optional[Customer]:
+    def get_by_id(self, customer_id: str) -> Optional[Customer]:
         pass
 
     @abstractmethod
@@ -20,7 +20,7 @@ class CustomerRepository(ABC):
         pass
 
     @abstractmethod
-    def delete(self, customer_id: int) -> bool:
+    def delete(self, customer_id: str) -> bool:
         pass
 
     @abstractmethod

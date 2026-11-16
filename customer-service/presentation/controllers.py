@@ -27,7 +27,7 @@ def create_customer_blueprint(
         customers = list_use_case.execute()
         return jsonify([c.to_dict() for c in customers]), 200
 
-    @bp.route("/customers/<int:customer_id>", methods=["GET"])
+    @bp.route("/customers/<string:customer_id>", methods=["GET"])
     def get_customer(customer_id):
         try:
             customer = get_use_case.execute(customer_id)
@@ -54,7 +54,7 @@ def create_customer_blueprint(
         except ValidationException as e:
             return jsonify({"error": str(e)}), 400
 
-    @bp.route("/customers/<int:customer_id>", methods=["PUT"])
+    @bp.route("/customers/<string:customer_id>", methods=["PUT"])
     def update_customer(customer_id):
         data = request.get_json() or {}
 
@@ -80,7 +80,7 @@ def create_customer_blueprint(
         except ValidationException as e:
             return jsonify({"error": str(e)}), 400
 
-    @bp.route("/customers/<int:customer_id>", methods=["DELETE"])
+    @bp.route("/customers/<string:customer_id>", methods=["DELETE"])
     def delete_customer(customer_id):
         try:
             delete_use_case.execute(customer_id)

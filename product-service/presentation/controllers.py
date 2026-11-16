@@ -8,6 +8,7 @@ from application.use_cases import (
     UpdateProductUseCase,
     DeleteProductUseCase,
 )
+from application.events import AuditService
 
 def create_product_blueprint(
     list_use_case: ListProductsUseCase,
@@ -15,6 +16,7 @@ def create_product_blueprint(
     create_use_case: CreateProductUseCase,
     update_use_case: UpdateProductUseCase,
     delete_use_case: DeleteProductUseCase,
+    audit_service: AuditService = None,
 ) -> Blueprint:
     bp = Blueprint("products", __name__)
 
@@ -88,5 +90,14 @@ def create_product_blueprint(
             return jsonify({"message": f"Produto {product_id} removido com sucesso"}), 200
         except EntityNotFoundException as e:
             return jsonify({"error": str(e)}), 404
+
+    # ==================== AUDITORIA / EVENTOS CONSUMIDOS ====================
+    @bp.route("/audit-logs", methods=["GET"])
+    def get_audit_logs():
+        """Retorna eventos recebidos e persistidos para auditoria/rastreamento assíncrono."""
+        if audit_service:
+            logs = audit_service.get_logs()
+            return jsonify(logs), 200
+        return jsonify([]), 200
 
     return bp

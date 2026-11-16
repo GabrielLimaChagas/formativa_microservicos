@@ -32,6 +32,9 @@ created_customer = res.get_json()
 created_id = created_customer["id"]
 print(f"POST /customers: OK (ID: {created_id})")
 
+from infrastructure.event_publisher import get_in_memory_event_bus
+latest_customer_event = get_in_memory_event_bus()[-1] if get_in_memory_event_bus() else None
+
 # 3. Obter cliente
 res = customer_client.get(f"/customers/{created_id}")
 assert res.status_code == 200, f"Falha GET /customers/{created_id}"
@@ -105,6 +108,47 @@ print(f"DELETE /products/{prod_id}: OK")
 res = product_client.get(f"/products/{prod_id}")
 assert res.status_code == 404
 print("Verificação pós-delete: OK (404 retornado corretamente)")
+
+print("\n--- [3/3] Testando Mensageria Assíncrona e Segurança no Gateway ---")
+# 1. Validação de Mensageria: Disparo de evento ao criar cliente
+assert latest_customer_event is not None, "Evento de criação de cliente não foi capturado na fila"
+assert latest_customer_event["eventType"] == "CustomerCreatedEvent"
+print("Mensageria / Produtor (Customer Service): OK (CustomerCreatedEvent publicado com sucesso)")
+
+# 2. Consumidor no Product Service
+product_app.event_consumer.process_event(latest_customer_event["eventType"], latest_customer_event["payload"])
+res_audit = product_client.get("/audit-logs")
+assert res_audit.status_code == 200
+audit_records = res_audit.get_json()
+assert any(r["eventType"] == "CustomerCreatedEvent" for r in audit_records)
+print("Mensageria / Consumidor (Product Service Audit): OK (Evento persistido em audit_logs)")
+
+# 3. Segurança no API Gateway: JWT
+for mod_prefix in ["app", "database", "models", "domain", "application", "infrastructure", "presentation"]:
+    to_delete = [k for k in sys.modules if k == mod_prefix or k.startswith(f"{mod_prefix}.")]
+    for k in to_delete:
+        del sys.modules[k]
+
+sys.path.remove(os.path.join(os.path.dirname(__file__), "product-service"))
+from app import app as gateway_app
+gateway_client = gateway_app.test_client()
+
+# Tenta acessar endpoint protegido sem token (401)
+res_unauth = gateway_client.get("/api/auth/verify")
+assert res_unauth.status_code == 401
+print("Gateway Auth: 401 Unauthorized sem token verificado com sucesso")
+
+# Login e geração de token
+res_login = gateway_client.post("/api/auth/login", json={"username": "admin", "password": "123"})
+assert res_login.status_code == 200
+token = res_login.get_json()["token"]
+print("Gateway Auth: Token JWT gerado com sucesso")
+
+# Acesso com Bearer token
+res_auth = gateway_client.get("/api/auth/verify", headers={"Authorization": f"Bearer {token}"})
+assert res_auth.status_code == 200
+assert res_auth.get_json()["valid"] is True
+print("Gateway Auth: Validação de Bearer Token JWT bem sucedida")
 
 print("\n==========================================")
 print(" TODOS OS TESTES UNITÁRIOS E CRUD PASSARAM COM SUCESSO! ")

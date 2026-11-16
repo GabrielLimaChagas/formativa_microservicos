@@ -1,9 +1,8 @@
 import os
 from flask import Flask
 from flask_cors import CORS
-from infrastructure.database import db
-from infrastructure.models import CustomerModel
-from infrastructure.repositories import SQLAlchemyCustomerRepository
+from infrastructure.mongo_repository import MongoDBCustomerRepository
+from infrastructure.event_publisher import AzureServiceBusEventPublisher
 from application.use_cases import (
     ListCustomersUseCase,
     GetCustomerUseCase,
@@ -13,25 +12,26 @@ from application.use_cases import (
 )
 from presentation.controllers import create_customer_blueprint
 
-def create_app(database_uri=None):
+# Instância padrão do repositório para o composition root
+customer_repo = MongoDBCustomerRepository()
+
+def create_app(repo=None):
     app = Flask(__name__)
     CORS(app)
 
-    basedir = os.path.abspath(os.path.dirname(__file__))
-    app.config["SQLALCHEMY_DATABASE_URI"] = database_uri or os.getenv(
-        "DATABASE_URL", f"sqlite:///{os.path.join(basedir, 'customers.db')}"
-    )
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    repository = repo or customer_repo
 
-    db.init_app(app)
+    # Inicializa mensageria assíncrona (Azure Service Bus com fallback in-memory)
+    sb_conn = os.getenv("AZURE_SERVICEBUS_CONNECTION_STRING", "")
+    sb_queue = os.getenv("AZURE_SERVICEBUS_QUEUE_NAME", "customer-events")
+    event_publisher = AzureServiceBusEventPublisher(connection_string=sb_conn, queue_name=sb_queue)
 
     # Injeção de dependências (Composition Root)
-    customer_repo = SQLAlchemyCustomerRepository()
-    list_use_case = ListCustomersUseCase(customer_repo)
-    get_use_case = GetCustomerUseCase(customer_repo)
-    create_use_case = CreateCustomerUseCase(customer_repo)
-    update_use_case = UpdateCustomerUseCase(customer_repo)
-    delete_use_case = DeleteCustomerUseCase(customer_repo)
+    list_use_case = ListCustomersUseCase(repository)
+    get_use_case = GetCustomerUseCase(repository)
+    create_use_case = CreateCustomerUseCase(repository, event_publisher=event_publisher)
+    update_use_case = UpdateCustomerUseCase(repository)
+    delete_use_case = DeleteCustomerUseCase(repository)
 
     customer_bp = create_customer_blueprint(
         list_use_case=list_use_case,
@@ -47,23 +47,10 @@ def create_app(database_uri=None):
 app = create_app()
 
 def init_db():
-    with app.app_context():
-        db.create_all()
-        # Seed inicial se banco estiver vazio
-        if CustomerModel.query.count() == 0:
-            seed_data = [
-                CustomerModel(name="Maria", pipelines_count=2),
-                CustomerModel(name="Antônio", pipelines_count=27),
-            ]
-            db.session.bulk_save_objects(seed_data)
-            db.session.commit()
-            print("Seed de dados para Clientes aplicado com sucesso!")
+    customer_repo.seed_initial_data()
 
-# Garante inicialização do banco mesmo ao executar via Gunicorn/App Service
+# Garante inicialização / seed do banco
 init_db()
-
-# Backward compatibility para imports externos legados caso existam
-Customer = CustomerModel
 
 if __name__ == "__main__":
     init_db()

@@ -4,11 +4,13 @@ from domain.exceptions import ValidationException
 
 @dataclass
 class Customer:
-    id: Optional[int]
+    id: Optional[str]
     name: str
     pipelines_count: int = 0
 
     def __post_init__(self):
+        if self.id is not None:
+            self.id = str(self.id)
         self.validate()
 
     def validate(self):
