@@ -1,0 +1,4 @@
+# Requirements de Testes Automatizados e Fitness Functions de Arquitetura
+pytest>=8.0.0
+pytest-archon>=0.0.7
+typeguard>=4.0.0
