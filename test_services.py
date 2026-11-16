@@ -58,12 +58,10 @@ print("Verificação pós-delete: OK (404 retornado corretamente)")
 
 print("\n--- [2/2] Testando Product Service ---")
 # Reset módulos importados para carregar product_app limpo
-if "app" in sys.modules:
-    del sys.modules["app"]
-if "database" in sys.modules:
-    del sys.modules["database"]
-if "models" in sys.modules:
-    del sys.modules["models"]
+for mod_prefix in ["app", "database", "models", "domain", "application", "infrastructure", "presentation"]:
+    to_delete = [k for k in sys.modules if k == mod_prefix or k.startswith(f"{mod_prefix}.")]
+    for k in to_delete:
+        del sys.modules[k]
 
 sys.path.remove(os.path.join(os.path.dirname(__file__), "customer-service"))
 from app import app as product_app, init_db as init_product_db

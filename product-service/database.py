@@ -1,3 +1,5 @@
-from flask_sqlalchemy import SQLAlchemy
+# Backward compatibility bridge to infrastructure
+from infrastructure.database import db
+from infrastructure.models import ProductModel as Product
 
-db = SQLAlchemy()
+__all__ = ["db", "Product"]
