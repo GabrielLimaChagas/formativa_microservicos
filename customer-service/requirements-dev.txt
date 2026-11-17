@@ -1,0 +1,4 @@
+# Requirements de desenvolvimento e testes
+pytest>=8.0.0
+pytest-archon>=0.0.7
+typeguard>=4.0.0

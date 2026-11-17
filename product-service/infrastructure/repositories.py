@@ -43,3 +43,12 @@ class SQLAlchemyProductRepository(ProductRepository):
 
     def count(self) -> int:
         return ProductModel.query.count()
+
+    def seed_initial_data(self) -> None:
+        if self.count() == 0:
+            seed_data = [
+                ProductModel(name="Roçadeira Stihl", price=25999),
+                ProductModel(name="Óleo 2T", price=3299),
+            ]
+            db.session.bulk_save_objects(seed_data)
+            db.session.commit()

@@ -70,8 +70,9 @@ def create_app(database_uri=None):
 
 app = create_app()
 
-def init_db():
-    with app.app_context():
+def init_db(app_instance=None):
+    target_app = app_instance or app
+    with target_app.app_context():
         db.create_all()
         # Seed inicial se banco estiver vazio
         if ProductModel.query.count() == 0:

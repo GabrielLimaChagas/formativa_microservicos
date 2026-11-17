@@ -1,4 +1,9 @@
+import os
+import logging
+import traceback
 from flask import Blueprint, request, jsonify
+from sqlalchemy import text
+from infrastructure.database import db
 from domain.exceptions import EntityNotFoundException, ValidationException
 from application.dtos import CreateProductDTO, UpdateProductDTO
 from application.use_cases import (
@@ -9,6 +14,8 @@ from application.use_cases import (
     DeleteProductUseCase,
 )
 from application.events import AuditService
+
+logger = logging.getLogger("product-service.controllers")
 
 def create_product_blueprint(
     list_use_case: ListProductsUseCase,
@@ -22,7 +29,35 @@ def create_product_blueprint(
 
     @bp.route("/health", methods=["GET"])
     def health():
-        return jsonify({"status": "UP", "service": "product-service"}), 200
+        azure_sql_set = bool(os.getenv("AZURE_SQL_CONNECTION_STRING"))
+        db_uri = db.engine.url.render_as_string(hide_password=True)
+        dialect = db.engine.dialect.name
+
+        db_status = "UNKNOWN"
+        db_error = None
+
+        try:
+            with db.engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+            db_status = "UP"
+        except Exception as e:
+            db_status = "DOWN"
+            db_error = str(e)
+            logger.error(f"[HEALTH_CHECK_FAILED] Falha ao testar conexão com banco: {e}\n{traceback.format_exc()}")
+
+        health_data = {
+            "status": "UP" if db_status == "UP" else "DEGRADED",
+            "service": "product-service",
+            "azureSqlConfigured": azure_sql_set,
+            "dialect": dialect,
+            "database": {
+                "status": db_status,
+                "engineUrl": db_uri,
+                "error": db_error
+            }
+        }
+        status_code = 200 if db_status == "UP" else 503
+        return jsonify(health_data), status_code
 
     @bp.route("/products", methods=["GET"])
     def get_products():
