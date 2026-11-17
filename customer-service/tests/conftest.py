@@ -7,28 +7,21 @@ if service_dir not in sys.path:
     sys.path.insert(0, service_dir)
 
 from app import create_app
-from infrastructure.database import db
-from infrastructure.models import CustomerModel
-from infrastructure.repositories import SQLAlchemyCustomerRepository
-from infrastructure.event_publisher import clear_in_memory_event_bus, get_in_memory_event_bus
+from infrastructure.mongo_repository import MongoCustomerRepository
+from infrastructure.event_publisher import clear_in_memory_event_bus
 
 @pytest.fixture
-def app():
-    clear_in_memory_event_bus()
-    test_app = create_app(database_uri="sqlite:///:memory:")
-    test_app.config["TESTING"] = True
+def repository():
+    # Repositório isolado em memória (URI vazia ativa o fallback em memória)
+    return MongoCustomerRepository(uri="", db_name="test_customers_db")
 
-    with test_app.app_context():
-        db.create_all()
-        yield test_app
-        db.session.remove()
-        db.drop_all()
+@pytest.fixture
+def app(repository):
+    clear_in_memory_event_bus()
+    test_app = create_app(repo=repository)
+    test_app.config["TESTING"] = True
+    return test_app
 
 @pytest.fixture
 def client(app):
     return app.test_client()
-
-@pytest.fixture
-def repository(app):
-    with app.app_context():
-        return SQLAlchemyCustomerRepository()

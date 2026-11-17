@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 from domain.entities import Customer
 from domain.exceptions import EntityNotFoundException
 from domain.repositories import CustomerRepository, EventPublisher
@@ -19,7 +19,7 @@ class GetCustomerUseCase:
     def __init__(self, repository: CustomerRepository):
         self._repository = repository
 
-    def execute(self, customer_id: int) -> CustomerDTO:
+    def execute(self, customer_id: Union[str, int]) -> CustomerDTO:
         customer = self._repository.get_by_id(customer_id)
         if not customer:
             raise EntityNotFoundException("Cliente não encontrado")
@@ -55,7 +55,7 @@ class UpdateCustomerUseCase:
     def __init__(self, repository: CustomerRepository):
         self._repository = repository
 
-    def execute(self, customer_id: int, dto: UpdateCustomerDTO) -> CustomerDTO:
+    def execute(self, customer_id: Union[str, int], dto: UpdateCustomerDTO) -> CustomerDTO:
         customer = self._repository.get_by_id(customer_id)
         if not customer:
             raise EntityNotFoundException("Cliente não encontrado")
@@ -68,7 +68,7 @@ class DeleteCustomerUseCase:
     def __init__(self, repository: CustomerRepository):
         self._repository = repository
 
-    def execute(self, customer_id: int) -> None:
+    def execute(self, customer_id: Union[str, int]) -> None:
         deleted = self._repository.delete(customer_id)
         if not deleted:
             raise EntityNotFoundException("Cliente não encontrado")
@@ -82,7 +82,7 @@ class BillingRequestUseCase:
         self._repository = repository
         self._event_publisher = event_publisher
 
-    def execute(self, customer_id: int, amount_cents: int = 0, description: str = "") -> dict:
+    def execute(self, customer_id: Union[str, int], amount_cents: int = 0, description: str = "") -> dict:
         customer = self._repository.get_by_id(customer_id)
         if not customer:
             raise EntityNotFoundException("Cliente não encontrado")

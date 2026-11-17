@@ -5,15 +5,6 @@ ENV PORT=5001
 
 WORKDIR /app
 
-# Instala dependências de sistema para o driver ODBC (SQL Server / Azure SQL Database)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    gnupg \
-    unixodbc-dev \
-    gcc \
-    g++ \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt

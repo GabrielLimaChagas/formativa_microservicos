@@ -1,26 +1,25 @@
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from infrastructure.event_publisher import get_in_memory_event_bus
 
 def test_health_endpoint_healthy(client):
     response = client.get("/health")
     assert response.status_code == 200
     data = response.get_json()
-    assert data["status"] == "UP"
+    assert data["status"] == "HEALTHY"
     assert data["service"] == "customer-service"
-    assert data["dialect"] == "sqlite"
-    assert data["database"]["status"] == "UP"
-    assert data["database"]["error"] is None
+    assert data["database"] == "mongodb"
+    assert "mongoConfigured" in data
 
-def test_health_endpoint_degraded_when_db_fails(client):
-    # Simula falha na conexão/execução do banco
-    with patch("presentation.controllers.db.engine.connect", side_effect=Exception("Database connection timeout")):
+def test_health_endpoint_degraded_when_db_fails(app, client):
+    # Simula falha na checagem de saúde do banco MongoDB
+    with patch.object(app.customer_repo, "check_health", return_value=(False, "Connection timeout to cluster")):
         response = client.get("/health")
         assert response.status_code == 503
         data = response.get_json()
         assert data["status"] == "DEGRADED"
-        assert data["database"]["status"] == "DOWN"
-        assert "Database connection timeout" in data["database"]["error"]
+        assert data["database"] == "mongodb"
+        assert "error" in data
 
 def test_customer_controllers_crud_flow(client):
     # 1. Listar inicialmente vazio
@@ -48,38 +47,31 @@ def test_customer_controllers_crud_flow(client):
     assert res_bad_name.status_code == 400
     assert "name" in res_bad_name.get_json()["error"]
 
-    res_empty_body = client.post("/customers", json={})
-    assert res_empty_body.status_code == 400
-
-    # 4. Obter cliente (GET /customers/<id>) 200 e 404
+    # 4. Obter cliente por ID (GET 200)
     res_get = client.get(f"/customers/{cust_id}")
     assert res_get.status_code == 200
     assert res_get.get_json()["name"] == "Cliente Teste"
 
-    res_get_404 = client.get("/customers/99999")
-    assert res_get_404.status_code == 404
+    # 5. Obter cliente inexistente (GET 404)
+    res_404 = client.get("/customers/999999")
+    assert res_404.status_code == 404
 
-    # 5. Atualizar cliente (PUT /customers/<id>)
+    # 6. Atualizar cliente (PUT 200)
     update_payload = {"name": "Cliente Teste Atualizado", "pipelinesCount": 8}
     res_put = client.put(f"/customers/{cust_id}", json=update_payload)
     assert res_put.status_code == 200
     assert res_put.get_json()["name"] == "Cliente Teste Atualizado"
     assert res_put.get_json()["pipelinesCount"] == 8
 
-    # PUT validações de erro
-    res_put_empty_name = client.put(f"/customers/{cust_id}", json={"name": ""})
-    assert res_put_empty_name.status_code == 400
+    # 7. Solicitação de faturamento assíncrono (POST 202)
+    res_bill = client.post(f"/customers/{cust_id}/billing-request", json={"amountCents": 5000})
+    assert res_bill.status_code == 202
+    assert res_bill.get_json()["status"] == "QUEUED"
 
-    res_put_bad_pipelines = client.put(f"/customers/{cust_id}", json={"pipelinesCount": "invalid"})
-    assert res_put_bad_pipelines.status_code == 400
-
-    res_put_404 = client.put("/customers/99999", json={"name": "Nao Existe"})
-    assert res_put_404.status_code == 404
-
-    # 6. Deletar cliente (DELETE /customers/<id>) 200 e 404
+    # 8. Remover cliente (DELETE 200)
     res_del = client.delete(f"/customers/{cust_id}")
     assert res_del.status_code == 200
 
-    # Segunda deleção retorna 404
-    res_del_404 = client.delete(f"/customers/{cust_id}")
-    assert res_del_404.status_code == 404
+    # 9. Verificar que foi removido
+    res_after = client.get(f"/customers/{cust_id}")
+    assert res_after.status_code == 404

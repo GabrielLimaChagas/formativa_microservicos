@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Union
 from domain.entities import Customer
 
 class CustomerRepository(ABC):
@@ -8,7 +8,7 @@ class CustomerRepository(ABC):
         pass
 
     @abstractmethod
-    def get_by_id(self, customer_id: int) -> Optional[Customer]:
+    def get_by_id(self, customer_id: Union[str, int]) -> Optional[Customer]:
         pass
 
     @abstractmethod
@@ -20,7 +20,7 @@ class CustomerRepository(ABC):
         pass
 
     @abstractmethod
-    def delete(self, customer_id: int) -> bool:
+    def delete(self, customer_id: Union[str, int]) -> bool:
         pass
 
     @abstractmethod

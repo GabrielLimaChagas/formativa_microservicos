@@ -28,7 +28,7 @@ def test_domain_layer_does_not_import_outer_layers_or_frameworks():
     Regra de Dependência Clean Architecture:
     A camada 'domain/' deve ser puramente agnóstica de frameworks externos
     e não pode importar 'application', 'infrastructure', 'presentation',
-    nem 'flask', 'pymongo', 'sqlalchemy' ou 'azure'.
+    nem 'flask', 'pymongo', 'bson', 'sqlalchemy' ou 'azure'.
     """
     forbidden_in_domain = {
         "application",
@@ -36,6 +36,7 @@ def test_domain_layer_does_not_import_outer_layers_or_frameworks():
         "presentation",
         "flask",
         "pymongo",
+        "bson",
         "sqlalchemy",
         "flask_sqlalchemy",
         "azure",
@@ -67,11 +68,17 @@ def test_domain_layer_does_not_import_outer_layers_or_frameworks():
 def test_application_layer_does_not_import_infrastructure_or_presentation():
     """
     Regra de Dependência Clean Architecture:
-    A camada 'application/' pode importar 'domain', mas nunca 'infrastructure' ou 'presentation'.
+    A camada 'application/' pode importar 'domain', mas nunca 'infrastructure' ou 'presentation',
+    nem bibliotecas de banco de dados ou drivers como pymongo, bson, sqlalchemy, pyodbc.
     """
     forbidden_in_application = {
         "infrastructure",
         "presentation",
+        "pymongo",
+        "bson",
+        "sqlalchemy",
+        "flask_sqlalchemy",
+        "pyodbc",
     }
 
     violations = []
@@ -124,6 +131,48 @@ def test_customer_and_product_services_are_isolated():
 
     assert not violations, "\n".join(violations)
 
+def test_database_technology_per_service_fitness():
+    """
+    Architectural Fitness Function (Database-per-Service Technology Separation):
+    - customer-service utiliza MongoDB e NÃO pode importar sqlalchemy, flask_sqlalchemy ou pyodbc.
+    - product-service utiliza SQL relacional e NÃO pode importar pymongo ou bson.
+    """
+    violations = []
+
+    # Valida customer-service (não pode ter sqlalchemy/pyodbc)
+    forbidden_in_customer = {"sqlalchemy", "flask_sqlalchemy", "pyodbc", "pymssql"}
+    for root, _, files in os.walk(CUSTOMER_DIR):
+        if "tests" in root or "__pycache__" in root:
+            continue
+        for file in files:
+            if file.endswith(".py"):
+                full_path = os.path.join(root, file)
+                rel_path = os.path.relpath(full_path, CUSTOMER_DIR)
+                for mod, line in get_imported_modules(full_path):
+                    root_mod = mod.split(".")[0].lower()
+                    if root_mod in forbidden_in_customer:
+                        violations.append(
+                            f"Violacao de Banco em customer-service/{rel_path}:{line} -> Import SQL proibido: '{mod}'"
+                        )
+
+    # Valida product-service (não pode ter pymongo/bson)
+    forbidden_in_product = {"pymongo", "bson"}
+    for root, _, files in os.walk(PRODUCT_DIR):
+        if "tests" in root or "__pycache__" in root:
+            continue
+        for file in files:
+            if file.endswith(".py"):
+                full_path = os.path.join(root, file)
+                rel_path = os.path.relpath(full_path, PRODUCT_DIR)
+                for mod, line in get_imported_modules(full_path):
+                    root_mod = mod.split(".")[0].lower()
+                    if root_mod in forbidden_in_product:
+                        violations.append(
+                            f"Violacao de Banco em product-service/{rel_path}:{line} -> Import NoSQL proibido: '{mod}'"
+                        )
+
+    assert not violations, "\n".join(violations)
+
 # ==================== GATEWAY ISOLATION ====================
 
 def test_gateway_has_no_database_drivers_or_service_internals():
@@ -137,6 +186,7 @@ def test_gateway_has_no_database_drivers_or_service_internals():
         "sqlalchemy",
         "flask_sqlalchemy",
         "pymongo",
+        "bson",
         "pyodbc",
         "pymssql",
         "psycopg2",

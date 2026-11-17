@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
-from infrastructure.database import db
 from domain.exceptions import EntityNotFoundException, ValidationException
+from domain.repositories import CustomerRepository
 from application.dtos import CreateCustomerDTO, UpdateCustomerDTO
 from application.use_cases import (
     ListCustomersUseCase,
@@ -18,13 +18,14 @@ def create_customer_blueprint(
     update_use_case: UpdateCustomerUseCase,
     delete_use_case: DeleteCustomerUseCase,
     billing_use_case: BillingRequestUseCase = None,
+    repository: CustomerRepository = None,
 ) -> Blueprint:
     bp = Blueprint("customers", __name__)
 
     @bp.route("/health", methods=["GET"])
     def health():
         """
-        Health check detalhado do serviço e banco de dados
+        Health check detalhado do serviço e conexão com MongoDB
         ---
         tags:
           - Health
@@ -34,30 +35,28 @@ def create_customer_blueprint(
           503:
             description: Falha na conexão com banco de dados
         """
-        db_status = "UP"
-        db_error = None
-        dialect = "unknown"
-        status_code = 200
+        is_healthy = True
+        error_msg = None
+        mongo_configured = False
 
-        try:
-            with db.engine.connect() as conn:
-                dialect = db.engine.dialect.name
-        except Exception as e:
-            db_status = "DOWN"
-            db_error = str(e)
-            status_code = 503
+        if repository and hasattr(repository, "check_health"):
+            is_healthy, error_msg = repository.check_health()
+            mongo_configured = repository.is_configured() if hasattr(repository, "is_configured") else False
 
-        overall_status = "UP" if db_status == "UP" else "DEGRADED"
+        status_str = "HEALTHY" if is_healthy else "DEGRADED"
+        status_code = 200 if is_healthy else 503
 
-        return jsonify({
-            "status": overall_status,
+        response_body = {
+            "status": status_str,
             "service": "customer-service",
-            "dialect": dialect,
-            "database": {
-                "status": db_status,
-                "error": db_error
-            }
-        }), status_code
+            "database": "mongodb",
+            "mongoConfigured": mongo_configured,
+        }
+        if not is_healthy and error_msg:
+            # Exibe mensagem de erro genérica/sanitizada sem vazar credenciais ou URI
+            response_body["error"] = str(error_msg).split("@")[-1]
+
+        return jsonify(response_body), status_code
 
     @bp.route("/customers", methods=["GET"])
     def get_customers():
@@ -73,7 +72,7 @@ def create_customer_blueprint(
         customers = list_use_case.execute()
         return jsonify([c.to_dict() for c in customers]), 200
 
-    @bp.route("/customers/<int:customer_id>", methods=["GET"])
+    @bp.route("/customers/<string:customer_id>", methods=["GET"])
     def get_customer(customer_id):
         """
         Obter cliente por ID
@@ -83,7 +82,7 @@ def create_customer_blueprint(
         parameters:
           - name: customer_id
             in: path
-            type: integer
+            type: string
             required: true
         responses:
           200:
@@ -139,7 +138,7 @@ def create_customer_blueprint(
         except ValidationException as e:
             return jsonify({"error": str(e)}), 400
 
-    @bp.route("/customers/<int:customer_id>", methods=["PUT"])
+    @bp.route("/customers/<string:customer_id>", methods=["PUT"])
     def update_customer(customer_id):
         """
         Atualizar cliente
@@ -149,7 +148,7 @@ def create_customer_blueprint(
         parameters:
           - name: customer_id
             in: path
-            type: integer
+            type: string
             required: true
           - in: body
             name: body
@@ -192,7 +191,7 @@ def create_customer_blueprint(
         except ValidationException as e:
             return jsonify({"error": str(e)}), 400
 
-    @bp.route("/customers/<int:customer_id>", methods=["DELETE"])
+    @bp.route("/customers/<string:customer_id>", methods=["DELETE"])
     def delete_customer(customer_id):
         """
         Remover cliente
@@ -202,7 +201,7 @@ def create_customer_blueprint(
         parameters:
           - name: customer_id
             in: path
-            type: integer
+            type: string
             required: true
         responses:
           200:
@@ -216,7 +215,7 @@ def create_customer_blueprint(
         except EntityNotFoundException as e:
             return jsonify({"error": str(e)}), 404
 
-    @bp.route("/customers/<int:customer_id>/billing-request", methods=["POST"])
+    @bp.route("/customers/<string:customer_id>/billing-request", methods=["POST"])
     def billing_request(customer_id):
         """
         Disparar solicitação de faturamento assíncrono via Azure Service Bus
@@ -226,7 +225,7 @@ def create_customer_blueprint(
         parameters:
           - name: customer_id
             in: path
-            type: integer
+            type: string
             required: true
           - in: body
             name: body
