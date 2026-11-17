@@ -1,7 +1,10 @@
 import os
+import sys
 import logging
-from flask import Flask
+import traceback
+from flask import Flask, jsonify
 from flask_cors import CORS
+from sqlalchemy import text
 from infrastructure.database import db
 from infrastructure.models import CustomerModel
 from infrastructure.sql_repository import SQLAlchemyCustomerRepository
@@ -15,7 +18,13 @@ from application.use_cases import (
 )
 from presentation.controllers import create_customer_blueprint
 
-logger = logging.getLogger(__name__)
+# Configuração de logging estruturado para stdout (capturado pelo Azure Log Stream / Gunicorn)
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
+)
+logger = logging.getLogger("customer-service")
 
 # Instância padrão do repositório para o composition root
 customer_repo = SQLAlchemyCustomerRepository()
@@ -40,7 +49,7 @@ def create_app(database_uri=None, repo=None):
 
     repository = repo or customer_repo
 
-    # Inicializa mensageria assíncrona (Azure Service Bus com fallback in-memory)
+    # Inicializa mensageria assíncrona (Azure Service Bus com fallback in-memory seguro)
     sb_conn = os.getenv("AZURE_SERVICEBUS_CONNECTION_STRING", "")
     sb_queue = os.getenv("AZURE_SERVICEBUS_QUEUE_NAME", "customer-events")
     event_publisher = AzureServiceBusEventPublisher(connection_string=sb_conn, queue_name=sb_queue)
@@ -62,6 +71,18 @@ def create_app(database_uri=None, repo=None):
     app.register_blueprint(customer_bp)
     app.customer_repo = repository
 
+    # Handler global para capturar exceções não tratadas e registrar traceback completo
+    @app.errorhandler(500)
+    @app.errorhandler(Exception)
+    def handle_unhandled_exception(e):
+        tb = traceback.format_exc()
+        logger.error(f"[UNHANDLED_EXCEPTION] Erro 500 no customer-service: {e}\n{tb}")
+        return jsonify({
+            "error": "Erro interno no servidor (Customer Service)",
+            "detail": str(e),
+            "status": 500
+        }), 500
+
     return app
 
 app = create_app()
@@ -73,7 +94,8 @@ def init_db():
             customer_repo.seed_initial_data()
             logger.info("Banco de dados do Customer Service inicializado com sucesso.")
         except Exception as e:
-            logger.error(f"Erro ao inicializar banco de dados do Customer Service: {e}")
+            tb = traceback.format_exc()
+            logger.error(f"Erro ao inicializar banco de dados do Customer Service: {e}\n{tb}")
 
 # Garante inicialização / seed do banco
 init_db()
@@ -86,3 +108,4 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 5001))
     print(f"Customer Service iniciado na porta {port}")
     app.run(host="0.0.0.0", port=port, debug=True)
+
