@@ -1,7 +1,10 @@
 import os
+import logging
 from flask import Flask
 from flask_cors import CORS
-from infrastructure.mongo_repository import MongoDBCustomerRepository
+from infrastructure.database import db
+from infrastructure.models import CustomerModel
+from infrastructure.sql_repository import SQLAlchemyCustomerRepository
 from infrastructure.event_publisher import AzureServiceBusEventPublisher
 from application.use_cases import (
     ListCustomersUseCase,
@@ -12,12 +15,28 @@ from application.use_cases import (
 )
 from presentation.controllers import create_customer_blueprint
 
-# Instância padrão do repositório para o composition root
-customer_repo = MongoDBCustomerRepository()
+logger = logging.getLogger(__name__)
 
-def create_app(repo=None):
+# Instância padrão do repositório para o composition root
+customer_repo = SQLAlchemyCustomerRepository()
+
+def create_app(database_uri=None, repo=None):
     app = Flask(__name__)
     CORS(app)
+
+    # 1. Configuração do Banco de Dados: Azure SQL Database vs Fallback Local
+    azure_sql_uri = os.getenv("AZURE_SQL_CONNECTION_STRING")
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    fallback_uri = f"sqlite:///{os.path.join(basedir, 'customers.db')}"
+
+    app.config["SQLALCHEMY_DATABASE_URI"] = database_uri or azure_sql_uri or os.getenv("DATABASE_URL", fallback_uri)
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True,
+        "pool_recycle": 280,
+    }
+
+    db.init_app(app)
 
     repository = repo or customer_repo
 
@@ -41,16 +60,26 @@ def create_app(repo=None):
         delete_use_case=delete_use_case,
     )
     app.register_blueprint(customer_bp)
+    app.customer_repo = repository
 
     return app
 
 app = create_app()
 
 def init_db():
-    customer_repo.seed_initial_data()
+    with app.app_context():
+        try:
+            db.create_all()
+            customer_repo.seed_initial_data()
+            logger.info("Banco de dados do Customer Service inicializado com sucesso.")
+        except Exception as e:
+            logger.error(f"Erro ao inicializar banco de dados do Customer Service: {e}")
 
 # Garante inicialização / seed do banco
 init_db()
+
+# Backward compatibility para imports externos legados caso existam
+Customer = CustomerModel
 
 if __name__ == "__main__":
     init_db()

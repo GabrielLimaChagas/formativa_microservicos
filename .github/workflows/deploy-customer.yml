@@ -1,0 +1,29 @@
+name: Deploy Customer Service
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'customer-service/**'
+      - '.github/workflows/deploy-customer.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: azure-b1-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Customer Service
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: formativa-customer-service
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_CUSTOMER }}
+          package: ./customer-service

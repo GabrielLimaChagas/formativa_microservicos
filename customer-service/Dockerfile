@@ -5,8 +5,13 @@ ENV PORT=5001
 
 WORKDIR /app
 
+# Instala dependências de sistema para o driver ODBC (SQL Server / Azure SQL Database)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    gnupg \
+    unixodbc-dev \
+    gcc \
+    g++ \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -17,4 +22,4 @@ COPY . .
 
 EXPOSE 5001
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "2", "--threads", "4", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "1", "--threads", "4", "app:app"]

@@ -1,4 +1,4 @@
-from infrastructure.mongo_repository import MongoDBCustomerRepository
+from infrastructure.sql_repository import SQLAlchemyCustomerRepository
 from infrastructure.event_publisher import (
     AzureServiceBusEventPublisher,
     InMemoryEventPublisher,
@@ -7,7 +7,7 @@ from infrastructure.event_publisher import (
 )
 
 __all__ = [
-    "MongoDBCustomerRepository",
+    "SQLAlchemyCustomerRepository",
     "AzureServiceBusEventPublisher",
     "InMemoryEventPublisher",
     "get_in_memory_event_bus",
