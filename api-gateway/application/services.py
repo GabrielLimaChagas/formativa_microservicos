@@ -8,24 +8,28 @@ class SummaryService:
         self._customers_url = customers_service_url.rstrip("/")
         self._products_url = products_service_url.rstrip("/")
 
-    def get_summary(self) -> Dict[str, int]:
+    def get_summary(self) -> Dict[str, Any]:
         summary = {
             "customersCount": 0,
-            "productsCount": 0
+            "productsCount": 0,
+            "totalCatalogValueCents": 0,
+            "totalPipelinesCount": 0,
         }
         try:
             c_res = self._http_client.get(f"{self._customers_url}/customers", timeout=3.0)
             if c_res.status_code == 200:
-                data = json.loads(c_res.content.decode("utf-8"))
-                summary["customersCount"] = len(data)
+                customers_data = json.loads(c_res.content.decode("utf-8"))
+                summary["customersCount"] = len(customers_data)
+                summary["totalPipelinesCount"] = sum(int(c.get("pipelinesCount", 0)) for c in customers_data)
         except Exception:
             pass
 
         try:
             p_res = self._http_client.get(f"{self._products_url}/products", timeout=3.0)
             if p_res.status_code == 200:
-                data = json.loads(p_res.content.decode("utf-8"))
-                summary["productsCount"] = len(data)
+                products_data = json.loads(p_res.content.decode("utf-8"))
+                summary["productsCount"] = len(products_data)
+                summary["totalCatalogValueCents"] = sum(int(p.get("price", 0)) for p in products_data)
         except Exception:
             pass
 
