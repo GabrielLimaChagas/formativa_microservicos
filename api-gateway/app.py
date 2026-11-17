@@ -8,7 +8,14 @@ from presentation.controllers import create_gateway_blueprint
 
 def create_app():
     app = Flask(__name__)
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": "*"}},
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    )
+
 
     customers_service_url = os.getenv("CUSTOMERS_SERVICE_URL", "http://localhost:5001")
     products_service_url = os.getenv("PRODUCTS_SERVICE_URL", "http://localhost:5002")
