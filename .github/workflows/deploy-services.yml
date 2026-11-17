@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'api-gateway/**'
-      - 'customer-service/**'
-      - 'product-service/**'
   workflow_dispatch:
 
 # Impede deploys simultâneos para evitar 409 Conflict no Kudu/OneDeploy
