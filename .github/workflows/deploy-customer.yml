@@ -33,13 +33,15 @@ jobs:
           pip install -r customer-service/requirements.txt
           pip install pytest pytest-archon typeguard
 
-      - name: Run Pytest
+      - name: Run Pytest & Architecture Tests
         env:
           AZURE_SQL_CONNECTION_STRING: ''
           AZURE_SERVICEBUS_CONNECTION_STRING: ''
         run: |
           cd customer-service
           python -m pytest
+          cd ..
+          python -m pytest tests/
 
   deploy:
     name: Deploy Customer Service

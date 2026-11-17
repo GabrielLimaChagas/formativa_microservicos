@@ -33,10 +33,12 @@ jobs:
           pip install -r api-gateway/requirements.txt
           pip install pytest pytest-archon typeguard
 
-      - name: Run Pytest
+      - name: Run Pytest & Architecture Tests
         run: |
           cd api-gateway
           python -m pytest
+          cd ..
+          python -m pytest tests/
 
   deploy:
     name: Deploy API Gateway
