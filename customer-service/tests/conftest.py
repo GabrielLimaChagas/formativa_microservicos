@@ -9,14 +9,13 @@ if service_dir not in sys.path:
 from app import create_app
 from infrastructure.database import db
 from infrastructure.models import CustomerModel
-from infrastructure.sql_repository import SQLAlchemyCustomerRepository
+from infrastructure.repositories import SQLAlchemyCustomerRepository
 from infrastructure.event_publisher import clear_in_memory_event_bus, get_in_memory_event_bus
 
 @pytest.fixture
 def app():
     clear_in_memory_event_bus()
-    test_repo = SQLAlchemyCustomerRepository()
-    test_app = create_app(database_uri="sqlite:///:memory:", repo=test_repo)
+    test_app = create_app(database_uri="sqlite:///:memory:")
     test_app.config["TESTING"] = True
 
     with test_app.app_context():

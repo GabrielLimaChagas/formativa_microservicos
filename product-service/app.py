@@ -1,10 +1,11 @@
 import os
 from flask import Flask
 from flask_cors import CORS
+from flasgger import Swagger
 from infrastructure.database import db
 from infrastructure.models import ProductModel, AuditLogModel
 from infrastructure.repositories import SQLAlchemyProductRepository
-from infrastructure.event_consumer import AzureServiceBusEventConsumer
+from infrastructure.messaging.event_consumer import AzureServiceBusEventConsumer
 from application.events import AuditService
 from application.use_cases import (
     ListProductsUseCase,
@@ -20,7 +21,6 @@ def create_app(database_uri=None):
     CORS(app)
 
     # 1. Configuração do Banco de Dados: Azure SQL Database vs Fallback Local
-    # Se AZURE_SQL_CONNECTION_STRING estiver definida, utiliza a conexão gerenciada da nuvem
     azure_sql_uri = os.getenv("AZURE_SQL_CONNECTION_STRING")
     basedir = os.path.abspath(os.path.dirname(__file__))
     fallback_uri = f"sqlite:///{os.path.join(basedir, 'products.db')}"
@@ -31,6 +31,14 @@ def create_app(database_uri=None):
         "pool_pre_ping": True,
         "pool_recycle": 280,
     }
+
+    # Swagger / OpenAPI
+    app.config['SWAGGER'] = {
+        'title': 'Product Service API',
+        'uiversion': 3,
+        'specs_route': '/docs/'
+    }
+    Swagger(app)
 
     db.init_app(app)
 
@@ -63,6 +71,7 @@ def create_app(database_uri=None):
         update_use_case=update_use_case,
         delete_use_case=delete_use_case,
         audit_service=audit_service,
+        event_consumer=consumer,
     )
     app.register_blueprint(product_bp)
 
@@ -70,9 +79,8 @@ def create_app(database_uri=None):
 
 app = create_app()
 
-def init_db(app_instance=None):
-    target_app = app_instance or app
-    with target_app.app_context():
+def init_db():
+    with app.app_context():
         db.create_all()
         # Seed inicial se banco estiver vazio
         if ProductModel.query.count() == 0:

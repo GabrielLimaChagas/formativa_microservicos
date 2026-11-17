@@ -1,6 +1,6 @@
 from typing import List, Optional
 from domain.entities import Product
-from application.repositories import ProductRepository
+from domain.repositories import ProductRepository
 from infrastructure.database import db
 from infrastructure.models import ProductModel
 
@@ -13,7 +13,11 @@ class SQLAlchemyProductRepository(ProductRepository):
         ]
 
     def get_by_id(self, product_id: int) -> Optional[Product]:
-        record = db.session.get(ProductModel, product_id)
+        try:
+            p_id = int(product_id)
+        except (ValueError, TypeError):
+            return None
+        record = db.session.get(ProductModel, p_id)
         if not record:
             return None
         return Product(id=record.id, name=record.name, price=record.price)
@@ -25,7 +29,12 @@ class SQLAlchemyProductRepository(ProductRepository):
         return Product(id=record.id, name=record.name, price=record.price)
 
     def update(self, product: Product) -> Product:
-        record = db.session.get(ProductModel, product.id)
+        try:
+            p_id = int(product.id)
+        except (ValueError, TypeError):
+            return product
+
+        record = db.session.get(ProductModel, p_id)
         if not record:
             return product
         record.name = product.name
@@ -34,7 +43,11 @@ class SQLAlchemyProductRepository(ProductRepository):
         return Product(id=record.id, name=record.name, price=record.price)
 
     def delete(self, product_id: int) -> bool:
-        record = db.session.get(ProductModel, product_id)
+        try:
+            p_id = int(product_id)
+        except (ValueError, TypeError):
+            return False
+        record = db.session.get(ProductModel, p_id)
         if not record:
             return False
         db.session.delete(record)

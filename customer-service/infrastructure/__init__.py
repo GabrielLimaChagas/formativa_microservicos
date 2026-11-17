@@ -1,4 +1,6 @@
-from infrastructure.sql_repository import SQLAlchemyCustomerRepository
+from infrastructure.database import db
+from infrastructure.models import CustomerModel
+from infrastructure.repositories import SQLAlchemyCustomerRepository
 from infrastructure.event_publisher import (
     AzureServiceBusEventPublisher,
     InMemoryEventPublisher,
@@ -7,6 +9,8 @@ from infrastructure.event_publisher import (
 )
 
 __all__ = [
+    "db",
+    "CustomerModel",
     "SQLAlchemyCustomerRepository",
     "AzureServiceBusEventPublisher",
     "InMemoryEventPublisher",

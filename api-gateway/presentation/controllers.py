@@ -1,7 +1,6 @@
 from flask import Blueprint, request, jsonify, Response
-from application.interfaces import HttpClient
+from domain.interfaces import HttpClient, TokenService
 from application.services import SummaryService, HealthService
-from application.security import TokenService
 from presentation.auth_middleware import require_auth
 
 def create_gateway_blueprint(
@@ -33,18 +32,35 @@ def create_gateway_blueprint(
             content_type=response.content_type
         )
 
-    # ==================== AUTENTICAÇÃO / LOGIN ====================
+    # ==================== AUTENTICAÇÃO / LOGIN (PÚBLICO) ====================
+    @bp.route("/api/auth/token", methods=["POST"])
     @bp.route("/api/auth/login", methods=["POST"])
     def login():
         """
-        Endpoint centralizado de login/geração de token JWT.
-        Em ambiente padrão aceita credenciais de teste para emissão de Bearer Token.
+        Emitir Token JWT de Acesso
+        ---
+        tags:
+          - Autenticação
+        parameters:
+          - in: body
+            name: body
+            schema:
+              type: object
+              required:
+                - username
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+        responses:
+          200:
+            description: Token gerado com sucesso
+          400:
+            description: Dados incompletos
         """
         data = request.get_json() or {}
         username = data.get("username", "").strip()
-        password = data.get("password", "").strip()
-
-        # Validação simples para emissão do token
         if not username:
             return jsonify({"error": "Campo 'username' obrigatório"}), 400
 
@@ -59,34 +75,128 @@ def create_gateway_blueprint(
     @bp.route("/api/auth/verify", methods=["GET"])
     @auth
     def verify():
+        """
+        Verificar validade do Token Bearer
+        ---
+        tags:
+          - Autenticação
+        security:
+          - BearerAuth: []
+        responses:
+          200:
+            description: Token válido
+          401:
+            description: Token ausente ou inválido
+        """
         return jsonify({"valid": True, "user": getattr(request, "user", None)}), 200
 
-    # ==================== ROTEAMENTO: CLIENTES ====================
+    # ==================== ROTEAMENTO PROTEGIDO: CLIENTES ====================
     @bp.route("/api/customers", methods=["GET", "POST"])
+    @auth
     def proxy_customers_root():
+        """
+        Proxy Clientes (Listar e Criar)
+        ---
+        tags:
+          - Clientes (Proxy)
+        security:
+          - BearerAuth: []
+        responses:
+          200:
+            description: Sucesso
+          401:
+            description: Não autenticado
+        """
         return _forward(f"{customers_url}/customers")
 
-    @bp.route("/api/customers/<path:subpath>", methods=["GET", "PUT", "DELETE"])
+    @bp.route("/api/customers/<path:subpath>", methods=["GET", "PUT", "DELETE", "POST"])
+    @auth
     def proxy_customers_subpath(subpath):
+        """
+        Proxy Clientes (Operações por ID e Billing Request)
+        ---
+        tags:
+          - Clientes (Proxy)
+        security:
+          - BearerAuth: []
+        responses:
+          200:
+            description: Sucesso
+          401:
+            description: Não autenticado
+        """
         return _forward(f"{customers_url}/customers/{subpath}")
 
-    # ==================== ROTEAMENTO: PRODUTOS ====================
+    # ==================== ROTEAMENTO PROTEGIDO: PRODUTOS ====================
     @bp.route("/api/products", methods=["GET", "POST"])
+    @auth
     def proxy_products_root():
+        """
+        Proxy Produtos (Listar e Criar)
+        ---
+        tags:
+          - Produtos (Proxy)
+        security:
+          - BearerAuth: []
+        responses:
+          200:
+            description: Sucesso
+          401:
+            description: Não autenticado
+        """
         return _forward(f"{products_url}/products")
 
-    @bp.route("/api/products/<path:subpath>", methods=["GET", "PUT", "DELETE"])
+    @bp.route("/api/products/<path:subpath>", methods=["GET", "PUT", "DELETE", "POST"])
+    @auth
     def proxy_products_subpath(subpath):
+        """
+        Proxy Produtos (Operações por ID, Audit Logs e Process Queue)
+        ---
+        tags:
+          - Produtos (Proxy)
+        security:
+          - BearerAuth: []
+        responses:
+          200:
+            description: Sucesso
+          401:
+            description: Não autenticado
+        """
         return _forward(f"{products_url}/products/{subpath}")
 
     # ==================== BFF / MONITORAMENTO ====================
     @bp.route("/api/health", methods=["GET"])
     def health_check():
+        """
+        Health check público agregado do Gateway e microsserviços
+        ---
+        tags:
+          - Monitoramento
+        responses:
+          200:
+            description: Ecossistema totalmente saudável
+          207:
+            description: Ecossistema em estado degradado
+        """
         data, status = health_service.check_health()
         return jsonify(data), status
 
     @bp.route("/api/summary", methods=["GET"])
+    @auth
     def bff_summary():
+        """
+        Endpoint BFF Agregador de Métricas Executivas
+        ---
+        tags:
+          - BFF
+        security:
+          - BearerAuth: []
+        responses:
+          200:
+            description: Resumo consolidado retornado com sucesso
+          401:
+            description: Não autorizado
+        """
         data = summary_service.get_summary()
         return jsonify(data), 200
 

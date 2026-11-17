@@ -1,18 +1,9 @@
+from domain.repositories import EventConsumer
 import json
 import logging
-from abc import ABC, abstractmethod
 from typing import Dict, Any, List
 
 logger = logging.getLogger(__name__)
-
-class EventConsumer(ABC):
-    @abstractmethod
-    def start_listening(self) -> None:
-        pass
-
-    @abstractmethod
-    def process_event(self, event_type: str, payload: Dict[str, Any]) -> None:
-        pass
 
 class AuditService:
     def __init__(self, db_session, audit_model):
@@ -30,3 +21,5 @@ class AuditService:
     def get_logs(self) -> List[Dict[str, Any]]:
         records = self.audit_model.query.order_by(self.audit_model.id.desc()).all()
         return [r.to_dict() for r in records]
+
+__all__ = ["EventConsumer", "AuditService"]

@@ -1,7 +1,7 @@
 import json
 import logging
 from typing import Dict, Any
-from application.events import EventPublisher
+from domain.repositories import EventPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +24,13 @@ class InMemoryEventPublisher(EventPublisher):
         logger.info(f"[InMemoryEventPublisher] Evento publicado: {event_type}")
 
 class AzureServiceBusEventPublisher(EventPublisher):
-    def __init__(self, connection_string: str, queue_name: str):
+    def __init__(self, connection_string: str, queue_name: str = "customer-events"):
         self.connection_string = connection_string
         self.queue_name = queue_name
 
     def publish(self, event_type: str, payload: Dict[str, Any]) -> None:
         if not self.connection_string:
+            # Fallback no-op seguro / in-memory caso a connection string esteja vazia
             InMemoryEventPublisher().publish(event_type, payload)
             return
 
@@ -43,5 +44,4 @@ class AzureServiceBusEventPublisher(EventPublisher):
                     logger.info(f"[AzureServiceBusEventPublisher] Evento '{event_type}' enviado para fila '{self.queue_name}'.")
         except Exception as e:
             logger.error(f"[AzureServiceBusEventPublisher] Erro ao enviar mensagem para Service Bus: {e}")
-            # Faz fallback em memória para não travar a aplicação em caso de indisponibilidade transitória
             InMemoryEventPublisher().publish(event_type, payload)

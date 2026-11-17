@@ -1,8 +1,4 @@
-import os
-import logging
-import traceback
 from flask import Blueprint, request, jsonify
-from sqlalchemy import text
 from infrastructure.database import db
 from domain.exceptions import EntityNotFoundException, ValidationException
 from application.dtos import CreateProductDTO, UpdateProductDTO
@@ -15,8 +11,6 @@ from application.use_cases import (
 )
 from application.events import AuditService
 
-logger = logging.getLogger("product-service.controllers")
-
 def create_product_blueprint(
     list_use_case: ListProductsUseCase,
     get_use_case: GetProductUseCase,
@@ -24,48 +18,80 @@ def create_product_blueprint(
     update_use_case: UpdateProductUseCase,
     delete_use_case: DeleteProductUseCase,
     audit_service: AuditService = None,
+    event_consumer = None,
 ) -> Blueprint:
     bp = Blueprint("products", __name__)
 
     @bp.route("/health", methods=["GET"])
     def health():
-        azure_sql_set = bool(os.getenv("AZURE_SQL_CONNECTION_STRING"))
-        db_uri = db.engine.url.render_as_string(hide_password=True)
-        dialect = db.engine.dialect.name
-
-        db_status = "UNKNOWN"
+        """
+        Health check detalhado do serviço e banco de dados
+        ---
+        tags:
+          - Health
+        responses:
+          200:
+            description: Serviço e banco de dados operacionais
+          503:
+            description: Falha na conexão com banco de dados
+        """
+        db_status = "UP"
         db_error = None
+        dialect = "unknown"
+        status_code = 200
 
         try:
-            with db.engine.connect() as connection:
-                connection.execute(text("SELECT 1"))
-            db_status = "UP"
+            with db.engine.connect() as conn:
+                dialect = db.engine.dialect.name
         except Exception as e:
             db_status = "DOWN"
             db_error = str(e)
-            logger.error(f"[HEALTH_CHECK_FAILED] Falha ao testar conexão com banco: {e}\n{traceback.format_exc()}")
+            status_code = 503
 
-        health_data = {
-            "status": "UP" if db_status == "UP" else "DEGRADED",
+        overall_status = "UP" if db_status == "UP" else "DEGRADED"
+
+        return jsonify({
+            "status": overall_status,
             "service": "product-service",
-            "azureSqlConfigured": azure_sql_set,
             "dialect": dialect,
             "database": {
                 "status": db_status,
-                "engineUrl": db_uri,
                 "error": db_error
             }
-        }
-        status_code = 200 if db_status == "UP" else 503
-        return jsonify(health_data), status_code
+        }), status_code
 
     @bp.route("/products", methods=["GET"])
     def get_products():
+        """
+        Listar todos os produtos
+        ---
+        tags:
+          - Produtos
+        responses:
+          200:
+            description: Lista de produtos
+        """
         products = list_use_case.execute()
         return jsonify([p.to_dict() for p in products]), 200
 
     @bp.route("/products/<int:product_id>", methods=["GET"])
     def get_product(product_id):
+        """
+        Obter produto por ID
+        ---
+        tags:
+          - Produtos
+        parameters:
+          - name: product_id
+            in: path
+            type: integer
+            required: true
+        responses:
+          200:
+            description: Produto encontrado
+          404:
+            description: Produto não encontrado
+        """
         try:
             product = get_use_case.execute(product_id)
             return jsonify(product.to_dict()), 200
@@ -74,6 +100,29 @@ def create_product_blueprint(
 
     @bp.route("/products", methods=["POST"])
     def create_product():
+        """
+        Criar novo produto
+        ---
+        tags:
+          - Produtos
+        parameters:
+          - in: body
+            name: body
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                price:
+                  type: integer
+        responses:
+          201:
+            description: Produto cadastrado com sucesso
+          400:
+            description: Dados inválidos
+        """
         data = request.get_json() or {}
         name = data.get("name", "")
         if not name or not str(name).strip():
@@ -94,6 +143,33 @@ def create_product_blueprint(
 
     @bp.route("/products/<int:product_id>", methods=["PUT"])
     def update_product(product_id):
+        """
+        Atualizar produto
+        ---
+        tags:
+          - Produtos
+        parameters:
+          - name: product_id
+            in: path
+            type: integer
+            required: true
+          - in: body
+            name: body
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                price:
+                  type: integer
+        responses:
+          200:
+            description: Produto atualizado
+          400:
+            description: Dados inválidos
+          404:
+            description: Produto não encontrado
+        """
         data = request.get_json() or {}
 
         name = None
@@ -120,6 +196,22 @@ def create_product_blueprint(
 
     @bp.route("/products/<int:product_id>", methods=["DELETE"])
     def delete_product(product_id):
+        """
+        Remover produto
+        ---
+        tags:
+          - Produtos
+        parameters:
+          - name: product_id
+            in: path
+            type: integer
+            required: true
+        responses:
+          200:
+            description: Produto removido com sucesso
+          404:
+            description: Produto não encontrado
+        """
         try:
             delete_use_case.execute(product_id)
             return jsonify({"message": f"Produto {product_id} removido com sucesso"}), 200
@@ -129,10 +221,34 @@ def create_product_blueprint(
     # ==================== AUDITORIA / EVENTOS CONSUMIDOS ====================
     @bp.route("/audit-logs", methods=["GET"])
     def get_audit_logs():
-        """Retorna eventos recebidos e persistidos para auditoria/rastreamento assíncrono."""
+        """
+        Consultar histórico de eventos auditados da mensageria
+        ---
+        tags:
+          - Auditoria & Mensageria
+        responses:
+          200:
+            description: Lista de eventos processados
+        """
         if audit_service:
             logs = audit_service.get_logs()
             return jsonify(logs), 200
         return jsonify([]), 200
+
+    @bp.route("/products/process-queue", methods=["POST"])
+    def process_queue_on_demand():
+        """
+        Processar mensagens pendentes da fila customer-events sob demanda
+        ---
+        tags:
+          - Auditoria & Mensageria
+        responses:
+          200:
+            description: Mensagens processadas da fila
+        """
+        if event_consumer and hasattr(event_consumer, "drain_queue_once"):
+            count = event_consumer.drain_queue_once(max_messages=10)
+            return jsonify({"status": "SUCCESS", "messagesProcessed": count}), 200
+        return jsonify({"status": "IDLE", "messagesProcessed": 0, "note": "Sem conexão remota de fila ativa"}), 200
 
     return bp

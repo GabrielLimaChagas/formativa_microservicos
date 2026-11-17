@@ -1,6 +1,6 @@
 import json
 from unittest.mock import patch, MagicMock
-from application.interfaces import HttpResponse
+from domain.interfaces import HttpResponse
 import requests
 
 def test_gateway_health_endpoint_healthy(client):
@@ -36,15 +36,15 @@ def test_gateway_health_endpoint_degraded(client):
         assert data["services"]["customers"] == "UP"
         assert data["services"]["products"] == "DOWN"
 
-def test_gateway_routing_to_customers(client):
-    # Simula encaminhamento GET /api/customers
+def test_gateway_routing_to_customers(client, auth_headers):
+    # Simula encaminhamento GET /api/customers com autenticação Bearer
     mock_resp = MagicMock()
     mock_resp.content = b'[{"id": "1", "name": "Maria"}]'
     mock_resp.status_code = 200
     mock_resp.headers = {"Content-Type": "application/json"}
 
     with patch("infrastructure.http_client.requests.request", return_value=mock_resp) as mock_req:
-        res = client.get("/api/customers")
+        res = client.get("/api/customers", headers=auth_headers)
         assert res.status_code == 200
         assert res.get_json() == [{"id": "1", "name": "Maria"}]
         mock_req.assert_called_once()
@@ -57,19 +57,19 @@ def test_gateway_routing_to_customers(client):
     mock_post_resp.headers = {"Content-Type": "application/json"}
 
     with patch("infrastructure.http_client.requests.request", return_value=mock_post_resp) as mock_req:
-        res = client.post("/api/customers", json={"name": "Joao"})
+        res = client.post("/api/customers", json={"name": "Joao"}, headers=auth_headers)
         assert res.status_code == 201
         assert res.get_json()["name"] == "Joao"
 
-def test_gateway_routing_to_products(client):
-    # Simula GET /api/products/1
+def test_gateway_routing_to_products(client, auth_headers):
+    # Simula GET /api/products/1 com autenticação Bearer
     mock_resp = MagicMock()
     mock_resp.content = b'{"id": 1, "name": "Serra"}'
     mock_resp.status_code = 200
     mock_resp.headers = {"Content-Type": "application/json"}
 
     with patch("infrastructure.http_client.requests.request", return_value=mock_resp) as mock_req:
-        res = client.get("/api/products/1")
+        res = client.get("/api/products/1", headers=auth_headers)
         assert res.status_code == 200
         assert res.get_json()["name"] == "Serra"
 
@@ -80,21 +80,21 @@ def test_gateway_routing_to_products(client):
     mock_404_resp.headers = {"Content-Type": "application/json"}
 
     with patch("infrastructure.http_client.requests.request", return_value=mock_404_resp):
-        res = client.get("/api/products/999")
+        res = client.get("/api/products/999", headers=auth_headers)
         assert res.status_code == 404
         assert res.get_json()["error"] == "Produto nao encontrado"
 
-def test_gateway_routing_resilience_connection_error_and_timeout(client):
+def test_gateway_routing_resilience_connection_error_and_timeout(client, auth_headers):
     # Simula ConnectionError -> 503 Service Unavailable
     with patch("infrastructure.http_client.requests.request", side_effect=requests.exceptions.ConnectionError("Down")):
-        res = client.get("/api/customers")
+        res = client.get("/api/customers", headers=auth_headers)
         assert res.status_code == 503
         data = res.get_json()
         assert "Falha na comunicação com o microsserviço" in data["error"]
 
     # Simula Timeout -> 504 Gateway Timeout
     with patch("infrastructure.http_client.requests.request", side_effect=requests.exceptions.Timeout("Timeout")):
-        res = client.get("/api/products")
+        res = client.get("/api/products", headers=auth_headers)
         assert res.status_code == 504
         data = res.get_json()
         assert "Gateway Timeout" in data["error"]

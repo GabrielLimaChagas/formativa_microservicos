@@ -17,3 +17,8 @@ def app():
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+@pytest.fixture
+def auth_headers(app):
+    token = app.token_service.generate_token({"sub": "test-user", "role": "admin"})
+    return {"Authorization": f"Bearer {token}"}

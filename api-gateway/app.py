@@ -1,6 +1,7 @@
 import os
 from flask import Flask
 from flask_cors import CORS
+from flasgger import Swagger
 from infrastructure.http_client import RequestsHttpClient
 from infrastructure.jwt_service import JwtTokenService
 from application.services import SummaryService, HealthService
@@ -8,14 +9,31 @@ from presentation.controllers import create_gateway_blueprint
 
 def create_app():
     app = Flask(__name__)
-    CORS(
-        app,
-        resources={r"/api/*": {"origins": "*"}},
-        supports_credentials=True,
-        allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept"],
-        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    )
 
+    # Configuração de CORS produtivo via CORS_ALLOWED_ORIGINS
+    cors_origins_env = os.getenv("CORS_ALLOWED_ORIGINS", "*").strip()
+    if cors_origins_env == "*":
+        allowed_origins = "*"
+    else:
+        allowed_origins = [orig.strip() for orig in cors_origins_env.split(",") if orig.strip()]
+
+    CORS(app, resources={r"/api/*": {"origins": allowed_origins}}, supports_credentials=True)
+
+    # Swagger / OpenAPI
+    app.config['SWAGGER'] = {
+        'title': 'API Gateway & BFF',
+        'uiversion': 3,
+        'specs_route': '/api/docs/',
+        'securityDefinitions': {
+            'BearerAuth': {
+                'type': 'apiKey',
+                'name': 'Authorization',
+                'in': 'header',
+                'description': 'Token JWT no formato: Bearer <token>'
+            }
+        }
+    }
+    Swagger(app)
 
     customers_service_url = os.getenv("CUSTOMERS_SERVICE_URL", "http://localhost:5001")
     products_service_url = os.getenv("PRODUCTS_SERVICE_URL", "http://localhost:5002")

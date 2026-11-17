@@ -1,8 +1,4 @@
-import os
-import logging
-import traceback
 from flask import Blueprint, request, jsonify
-from sqlalchemy import text
 from infrastructure.database import db
 from domain.exceptions import EntityNotFoundException, ValidationException
 from application.dtos import CreateCustomerDTO, UpdateCustomerDTO
@@ -12,9 +8,8 @@ from application.use_cases import (
     CreateCustomerUseCase,
     UpdateCustomerUseCase,
     DeleteCustomerUseCase,
+    BillingRequestUseCase,
 )
-
-logger = logging.getLogger("customer-service.controllers")
 
 def create_customer_blueprint(
     list_use_case: ListCustomersUseCase,
@@ -22,65 +17,111 @@ def create_customer_blueprint(
     create_use_case: CreateCustomerUseCase,
     update_use_case: UpdateCustomerUseCase,
     delete_use_case: DeleteCustomerUseCase,
+    billing_use_case: BillingRequestUseCase = None,
 ) -> Blueprint:
     bp = Blueprint("customers", __name__)
 
     @bp.route("/health", methods=["GET"])
     def health():
-        azure_sql_set = bool(os.getenv("AZURE_SQL_CONNECTION_STRING"))
-        db_uri = db.engine.url.render_as_string(hide_password=True)
-        dialect = db.engine.dialect.name
-
-        db_status = "UNKNOWN"
+        """
+        Health check detalhado do serviço e banco de dados
+        ---
+        tags:
+          - Health
+        responses:
+          200:
+            description: Serviço e banco de dados operacionais
+          503:
+            description: Falha na conexão com banco de dados
+        """
+        db_status = "UP"
         db_error = None
+        dialect = "unknown"
+        status_code = 200
 
         try:
-            with db.engine.connect() as connection:
-                connection.execute(text("SELECT 1"))
-            db_status = "UP"
+            with db.engine.connect() as conn:
+                dialect = db.engine.dialect.name
         except Exception as e:
             db_status = "DOWN"
             db_error = str(e)
-            logger.error(f"[HEALTH_CHECK_FAILED] Falha ao testar conexão com banco: {e}\n{traceback.format_exc()}")
+            status_code = 503
 
-        health_data = {
-            "status": "UP" if db_status == "UP" else "DEGRADED",
+        overall_status = "UP" if db_status == "UP" else "DEGRADED"
+
+        return jsonify({
+            "status": overall_status,
             "service": "customer-service",
-            "azureSqlConfigured": azure_sql_set,
             "dialect": dialect,
             "database": {
                 "status": db_status,
-                "engineUrl": db_uri,
                 "error": db_error
             }
-        }
-        status_code = 200 if db_status == "UP" else 503
-        return jsonify(health_data), status_code
+        }), status_code
 
     @bp.route("/customers", methods=["GET"])
     def get_customers():
-        try:
-            customers = list_use_case.execute()
-            return jsonify([c.to_dict() for c in customers]), 200
-        except Exception as e:
-            tb = traceback.format_exc()
-            logger.error(f"[GET /customers FAILED] Erro ao listar clientes: {e}\n{tb}")
-            return jsonify({"error": "Erro ao consultar clientes no banco de dados", "detail": str(e)}), 500
+        """
+        Listar todos os clientes
+        ---
+        tags:
+          - Clientes
+        responses:
+          200:
+            description: Lista de clientes
+        """
+        customers = list_use_case.execute()
+        return jsonify([c.to_dict() for c in customers]), 200
 
-    @bp.route("/customers/<string:customer_id>", methods=["GET"])
+    @bp.route("/customers/<int:customer_id>", methods=["GET"])
     def get_customer(customer_id):
+        """
+        Obter cliente por ID
+        ---
+        tags:
+          - Clientes
+        parameters:
+          - name: customer_id
+            in: path
+            type: integer
+            required: true
+        responses:
+          200:
+            description: Cliente encontrado
+          404:
+            description: Cliente não encontrado
+        """
         try:
             customer = get_use_case.execute(customer_id)
             return jsonify(customer.to_dict()), 200
         except EntityNotFoundException as e:
             return jsonify({"error": str(e)}), 404
-        except Exception as e:
-            tb = traceback.format_exc()
-            logger.error(f"[GET /customers/{customer_id} FAILED]: {e}\n{tb}")
-            return jsonify({"error": "Erro ao buscar cliente", "detail": str(e)}), 500
 
     @bp.route("/customers", methods=["POST"])
     def create_customer():
+        """
+        Criar novo cliente
+        ---
+        tags:
+          - Clientes
+        parameters:
+          - in: body
+            name: body
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                pipelinesCount:
+                  type: integer
+        responses:
+          201:
+            description: Cliente criado com sucesso
+          400:
+            description: Dados inválidos
+        """
         data = request.get_json() or {}
         name = data.get("name", "")
         if not name or not str(name).strip():
@@ -97,13 +138,36 @@ def create_customer_blueprint(
             return jsonify(created.to_dict()), 201
         except ValidationException as e:
             return jsonify({"error": str(e)}), 400
-        except Exception as e:
-            tb = traceback.format_exc()
-            logger.error(f"[POST /customers FAILED]: {e}\n{tb}")
-            return jsonify({"error": "Erro ao criar cliente", "detail": str(e)}), 500
 
-    @bp.route("/customers/<string:customer_id>", methods=["PUT"])
+    @bp.route("/customers/<int:customer_id>", methods=["PUT"])
     def update_customer(customer_id):
+        """
+        Atualizar cliente
+        ---
+        tags:
+          - Clientes
+        parameters:
+          - name: customer_id
+            in: path
+            type: integer
+            required: true
+          - in: body
+            name: body
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                pipelinesCount:
+                  type: integer
+        responses:
+          200:
+            description: Cliente atualizado
+          400:
+            description: Dados inválidos
+          404:
+            description: Cliente não encontrado
+        """
         data = request.get_json() or {}
 
         name = None
@@ -127,22 +191,69 @@ def create_customer_blueprint(
             return jsonify({"error": str(e)}), 404
         except ValidationException as e:
             return jsonify({"error": str(e)}), 400
-        except Exception as e:
-            tb = traceback.format_exc()
-            logger.error(f"[PUT /customers/{customer_id} FAILED]: {e}\n{tb}")
-            return jsonify({"error": "Erro ao atualizar cliente", "detail": str(e)}), 500
 
-    @bp.route("/customers/<string:customer_id>", methods=["DELETE"])
+    @bp.route("/customers/<int:customer_id>", methods=["DELETE"])
     def delete_customer(customer_id):
+        """
+        Remover cliente
+        ---
+        tags:
+          - Clientes
+        parameters:
+          - name: customer_id
+            in: path
+            type: integer
+            required: true
+        responses:
+          200:
+            description: Cliente removido com sucesso
+          404:
+            description: Cliente não encontrado
+        """
         try:
             delete_use_case.execute(customer_id)
             return jsonify({"message": f"Cliente {customer_id} removido com sucesso"}), 200
         except EntityNotFoundException as e:
             return jsonify({"error": str(e)}), 404
-        except Exception as e:
-            tb = traceback.format_exc()
-            logger.error(f"[DELETE /customers/{customer_id} FAILED]: {e}\n{tb}")
-            return jsonify({"error": "Erro ao remover cliente", "detail": str(e)}), 500
+
+    @bp.route("/customers/<int:customer_id>/billing-request", methods=["POST"])
+    def billing_request(customer_id):
+        """
+        Disparar solicitação de faturamento assíncrono via Azure Service Bus
+        ---
+        tags:
+          - Faturamento & Mensageria
+        parameters:
+          - name: customer_id
+            in: path
+            type: integer
+            required: true
+          - in: body
+            name: body
+            schema:
+              type: object
+              properties:
+                amountCents:
+                  type: integer
+                description:
+                  type: string
+        responses:
+          202:
+            description: Solicitação enfileirada no Service Bus
+          404:
+            description: Cliente não encontrado
+        """
+        if not billing_use_case:
+            return jsonify({"error": "Billing use case não configurado"}), 500
+
+        data = request.get_json() or {}
+        amount_cents = int(data.get("amountCents", 0))
+        description = str(data.get("description", ""))
+
+        try:
+            result = billing_use_case.execute(customer_id, amount_cents=amount_cents, description=description)
+            return jsonify(result), 202
+        except EntityNotFoundException as e:
+            return jsonify({"error": str(e)}), 404
 
     return bp
-
