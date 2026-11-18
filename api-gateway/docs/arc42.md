@@ -63,17 +63,17 @@ flowchart LR
 ```mermaid
 graph TD
     subgraph Presentation [presentation/]
-        Controllers[controllers.py (Blueprints)]
-        AuthMiddleware[auth_middleware.py (@require_auth)]
+        Controllers["controllers.py (Blueprints)"]
+        AuthMiddleware["auth_middleware.py (@require_auth)"]
     end
     subgraph Application [application/]
-        Interfaces[interfaces.py (HttpClient, HttpResponse)]
-        Security[security.py (TokenService)]
-        Services[services.py (SummaryService, HealthService)]
+        Interfaces["interfaces.py (HttpClient, HttpResponse)"]
+        Security["security.py (TokenService)"]
+        Services["services.py (SummaryService, HealthService)"]
     end
     subgraph Infrastructure [infrastructure/]
-        HttpClientImpl[http_client.py (RequestsHttpClient)]
-        JwtImpl[jwt_service.py (JwtTokenService)]
+        HttpClientImpl["http_client.py (RequestsHttpClient)"]
+        JwtImpl["jwt_service.py (JwtTokenService)"]
     end
 
     Controllers --> Services

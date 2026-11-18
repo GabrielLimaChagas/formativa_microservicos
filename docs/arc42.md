@@ -63,17 +63,17 @@ flowchart LR
 ```mermaid
 graph TD
     subgraph PresentationLayer [presentation/]
-        Controllers[controllers.py (Flask Blueprints)]
+        Controllers["controllers.py (Flask Blueprints)"]
     end
     subgraph ApplicationLayer [application/]
-        UseCases[use_cases.py (Casos de Uso)]
-        DTOs[dtos.py (DTOs de Entrada e Saída)]
-        RepoInterfaces[repositories.py (Interfaces Abstratas ABC)]
-        EventInterfaces[events.py (EventPublisher / EventConsumer)]
+        UseCases["use_cases.py (Casos de Uso)"]
+        DTOs["dtos.py (DTOs de Entrada e Saída)"]
+        RepoInterfaces["repositories.py (Interfaces Abstratas ABC)"]
+        EventInterfaces["events.py (EventPublisher / EventConsumer)"]
     end
     subgraph DomainLayer [domain/]
-        Entities[entities.py (Entidades Puras Customer, Product)]
-        Exceptions[exceptions.py (Domain Exceptions)]
+        Entities["entities.py (Entidades Puras Customer, Product)"]
+        Exceptions["exceptions.py (Domain Exceptions)"]
     end
     subgraph InfrastructureLayer [infrastructure/]
         MongoRepo[mongo_repository.py / MongoDBCustomerRepository]

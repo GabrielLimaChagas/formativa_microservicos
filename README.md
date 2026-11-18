@@ -2,8 +2,6 @@
 
 Repositório dos microsserviços de backend da plataforma **CRMaster** (`customer-service` e `product-service`), desenvolvidos em **Python / Flask** estruturados rigorosamente em **Clean Architecture**, princípios **SOLID**, padrão **Database-per-Service** e mensageria assíncrona orientada a eventos via **Azure Service Bus**.
 
-Consulte a documentação técnica completa em [docs/arc42.md](file:///c:/Users/Gabriel%20Faculdade/PUCPR/Projects/arquitetura/formativa_microservicos/docs/arc42.md).
-
 ---
 
 ## 👥 Integrantes do Grupo
@@ -95,15 +93,15 @@ Cada microsserviço é decomposto estritamente nas camadas da Clean Architecture
 ---
 
 ## 🌐 Links de Produção na Azure & Swagger
-* **Customer Service (Azure App Service):** [https://formativa-customer-service.azurewebsites.net](https://formativa-customer-service.azurewebsites.net)
-* **Product Service (Azure App Service):** [https://formativa-product-service.azurewebsites.net](https://formativa-product-service.azurewebsites.net)
-* **API Gateway & BFF:** [https://formativa-api-gateway.azurewebsites.net](https://formativa-api-gateway.azurewebsites.net)
-* **Documentação Swagger/OpenAPI:** [https://formativa-api-gateway.azurewebsites.net/api/docs](https://formativa-api-gateway.azurewebsites.net/api/docs) *(Placeholder)*
+* **Customer Service (Azure App Service):** [https://formativa-customer-service.azurewebsites.net/docs](https://formativa-customer-service.azurewebsites.net/docs/)
+* **Product Service (Azure App Service):** [https://formativa-product-service.azurewebsites.net/docs](https://formativa-product-service.azurewebsites.net/docs/)
+* **API Gateway & BFF:** [https://formativa-api-gateway.azurewebsites.net](https://formativa-api-gateway.azurewebsites.net/)
+* **Documentação Swagger/OpenAPI:** [https://formativa-api-gateway.azurewebsites.net/api/docs](https://formativa-api-gateway.azurewebsites.net/api/docs)
 
 ---
 
 ## 📹 Vídeo Demonstrativo (YouTube - Não Listado)
-* **Link do Vídeo:** `https://www.youtube.com/watch?v=SEU_LINK_AQUI` *(Inserir link do YouTube não listado)*
+* **Link do Vídeo:** [https://youtu.be/JhIgVuGcaQM](https://youtu.be/JhIgVuGcaQM)
 
 ### Checklist Roteirizado para Gravação:
 1. **Apresentação Inicial:** Todos os integrantes (`Cauã Kammler`, `Gabriel de Lima Chagas` e `Vinicius Soares da Silva`) com câmeras abertas e identificação do projeto.

@@ -74,14 +74,14 @@ O API Gateway atua como fronteira única de entrada e orquestrador de apresenta�
 ---
 
 ## 🌐 Links de Produção na Azure & Swagger
-* **API Gateway em Produção (Azure App Service):** [https://formativa-api-gateway.azurewebsites.net](https://formativa-api-gateway.azurewebsites.net) *(Atualize com a URL definitiva da Azure após o deploy)*
+* **API Gateway em Produção (Azure App Service):** [https://formativa-api-gateway.azurewebsites.net](https://formativa-api-gateway.azurewebsites.net)
 * **Health Check Agregado:** [https://formativa-api-gateway.azurewebsites.net/api/health](https://formativa-api-gateway.azurewebsites.net/api/health)
-* **Documentação Swagger/OpenAPI:** [https://formativa-api-gateway.azurewebsites.net/api/docs](https://formativa-api-gateway.azurewebsites.net/api/docs) *(Placeholder)*
+* **Documentação Swagger/OpenAPI:** [https://formativa-api-gateway.azurewebsites.net/api/docs](https://formativa-api-gateway.azurewebsites.net/api/docs)
 
 ---
 
 ## 📹 Vídeo Demonstrativo (YouTube - Não Listado)
-* **Link do Vídeo:** `https://www.youtube.com/watch?v=SEU_LINK_AQUI` *(Inserir link do YouTube não listado)*
+* **Link do Vídeo:** [https://youtu.be/JhIgVuGcaQM](https://youtu.be/JhIgVuGcaQM)
 
 ### Checklist Roteirizado para Gravação:
 1. **Apresentação Inicial:** Todos os integrantes (`Cauã Kammler`, `Gabriel de Lima Chagas` e `Vinicius Soares da Silva`) com câmeras abertas e identificação do projeto.
